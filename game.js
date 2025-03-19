@@ -1,71 +1,63 @@
+// Canvas setup
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
+// Clase Ball (Pelota)
 class Ball {
-    constructor(x, y, radius, speedX, speedY, color = 'white') {
+    constructor(x, y, radius, speedY, color = 'white') {
         this.x = x;
         this.y = y;
         this.radius = radius;
-        this.speedX = speedX;
         this.speedY = speedY;
         this.color = color;
         this.originalColor = color;
+        this.isVisible = true;
     }
-    draw() {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.closePath();
-        
-        // Dibujar carita feliz
-        ctx.fillStyle = 'black';
-        // Ojos
-        ctx.beginPath();
-        ctx.arc(this.x - this.radius / 3, this.y - this.radius / 3, this.radius / 6, 0, Math.PI * 2);
-        ctx.arc(this.x + this.radius / 3, this.y - this.radius / 3, this.radius / 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.closePath();
-        
-        // Boca
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius / 2.5, 0, Math.PI);
-        ctx.stroke();
-        ctx.closePath();
-    }
-    move() {
-        this.x += this.speedX;
-        this.y += this.speedY;
-        if (this.y - this.radius <= 0 || this.y + this.radius >= canvas.height) {
-            this.speedY = -this.speedY;
-        }
-        if (this.x - this.radius <= 0 || this.x + this.radius >= canvas.width) {
-            this.speedX = -this.speedX;
-        }
-    }
-    detectCollision(other) {
-        const dx = this.x - other.x;
-        const dy = this.y - other.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < this.radius + other.radius;
-    }
-    handleCollision(other) {
-        const tempSpeedX = this.speedX;
-        const tempSpeedY = this.speedY;
-        this.speedX = other.speedX;
-        this.speedY = other.speedY;
-        other.speedX = tempSpeedX;
-        other.speedY = tempSpeedY;
 
-        this.color = '#0000FF';
-        other.color = '#0000FF';
-        setTimeout(() => {
-            this.color = this.originalColor;
-            other.color = other.originalColor;
-        }, 100);
+    draw() {
+        if (this.isVisible) {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.closePath();
+
+            // Dibujar carita feliz
+            ctx.fillStyle = 'black';
+            // Ojos
+            ctx.beginPath();
+            ctx.arc(this.x - this.radius / 3, this.y - this.radius / 3, this.radius / 6, 0, Math.PI * 2);
+            ctx.arc(this.x + this.radius / 3, this.y - this.radius / 3, this.radius / 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.closePath();
+
+            // Boca
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius / 2.5, 0, Math.PI);
+            ctx.stroke();
+            ctx.closePath();
+        }
+    }
+
+    move() {
+        if (this.isVisible) {
+            this.y += this.speedY;
+
+            // Reiniciar círculo cuando llega al fondo
+            if (this.y - this.radius > canvas.height) {
+                this.y = -this.radius;
+                this.x = Math.random() * (canvas.width - 80) + 40;
+                this.isVisible = true;
+            }
+        }
+    }
+
+    isClicked(mouseX, mouseY) {
+        const dist = Math.sqrt((this.x - mouseX) ** 2 + (this.y - mouseY) ** 2);
+        return dist <= this.radius;
     }
 }
 
@@ -73,33 +65,85 @@ class Ball {
 class Game {
     constructor() {
         this.balls = [];
-        for (let i = 0; i < 10; i++) {
-            this.balls.push(new Ball(
-                Math.random() * (canvas.width - 80) + 40,
-                Math.random() * (canvas.height - 80) + 40,
-                30,
-                (Math.random() * 4 + 1) * (Math.random() > 0.5 ? 1 : -1),
-                (Math.random() * 4 + 1) * (Math.random() > 0.5 ? 1 : -1),
-                `hsl(${Math.random() * 360}, 100%, 50%)`
-            ));
+        this.deletedBallsCount = 0;
+        this.initialBallsCount = 10;
+
+        for (let i = 0; i < this.initialBallsCount; i++) {
+            this.addBall();
+        }
+
+        // Escuchar eventos tanto para mouse como para toque
+        canvas.addEventListener('click', (event) => this.handleClick(event)); // Mouse
+        canvas.addEventListener('touchstart', (event) => this.handleTouch(event)); // Touch
+    }
+
+    addBall() {
+        const radius = Math.random() * 20 + 20; // Tamaño aleatorio entre 20 y 40
+        this.balls.push(new Ball(
+            Math.random() * (canvas.width - 80) + 40,
+            Math.random() * (canvas.height - 80) + 40,
+            radius,
+            Math.random() * 4 + 1,
+            `hsl(${Math.random() * 360}, 100%, 50%)`
+        ));
+    }
+
+    handleClick(event) {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        this.checkBallClick(mouseX, mouseY);
+    }
+
+    handleTouch(event) {
+        const rect = canvas.getBoundingClientRect();
+        const touchX = event.touches[0].clientX - rect.left;
+        const touchY = event.touches[0].clientY - rect.top;
+
+        this.checkBallClick(touchX, touchY);
+        event.preventDefault(); // Para evitar el comportamiento predeterminado del toque
+    }
+
+    checkBallClick(mouseX, mouseY) {
+        for (let i = 0; i < this.balls.length; i++) {
+            const ball = this.balls[i];
+            if (ball.isVisible && ball.isClicked(mouseX, mouseY)) {
+                ball.isVisible = false;
+                this.deletedBallsCount++;
+                this.replaceBall(i);
+                break;
+            }
         }
     }
+
+    replaceBall(index) {
+        const radius = Math.random() * 20 + 20; // Nuevo tamaño aleatorio
+        this.balls[index] = new Ball(
+            Math.random() * (canvas.width - 80) + 40,
+            -radius,
+            radius,
+            Math.random() * 4 + 1,
+            `hsl(${Math.random() * 360}, 100%, 50%)`
+        );
+    }
+
     draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         this.balls.forEach(ball => ball.draw());
+
+        // Mostrar contador de círculos eliminados
+        ctx.font = '20px Arial';
+        ctx.fillStyle = 'white';
+        ctx.fillText(`Círculos eliminados: ${this.deletedBallsCount}`, canvas.width - 250, 30);
     }
+
     update() {
         this.balls.forEach(ball => {
             ball.move();
         });
-        for (let i = 0; i < this.balls.length; i++) {
-            for (let j = i + 1; j < this.balls.length; j++) {
-                if (this.balls[i].detectCollision(this.balls[j])) {
-                    this.balls[i].handleCollision(this.balls[j]);
-                }
-            }
-        }
     }
+
     run() {
         const gameLoop = () => {
             this.update();
